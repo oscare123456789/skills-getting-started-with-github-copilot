@@ -209,6 +209,21 @@ footer {
   white-space: nowrap;
 }
 
+.delete-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #c62828;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.delete-btn:hover {
+  background: rgba(198,40,40,0.08);
+}
+
 /* small helper when no participants */
 .participants-empty {
   font-style: italic;

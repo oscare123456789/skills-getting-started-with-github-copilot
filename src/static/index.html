@@ -15,8 +15,8 @@
     <main>
       <section id="activities-container">
         <h3>Available Activities</h3>
-        <div id="activities-list">
-          <!-- Activities will be loaded here -->
+        <div id="activities-list" aria-live="polite">
+          <!-- Activities will be loaded here by JS -->
           <p>Loading activities...</p>
         </div>
       </section>
@@ -37,7 +37,7 @@
           </div>
           <button type="submit">Sign Up</button>
         </form>
-        <div id="message" class="hidden"></div>
+        <div id="message" class="hidden" role="status" aria-live="polite"></div>
       </section>
     </main>
 
@@ -45,6 +45,144 @@
       <p>&copy; 2023 Mergington High School</p>
     </footer>
 
-    <script src="app.js"></script>
+    <!-- Inline script: fetch activities, render cards with participants, handle signups -->
+    <script>
+      (function () {
+        const activitiesList = document.getElementById('activities-list');
+        const activitySelect = document.getElementById('activity');
+        const signupForm = document.getElementById('signup-form');
+        const messageEl = document.getElementById('message');
+
+        function showMessage(text, type = 'info') {
+          messageEl.className = '';
+          messageEl.classList.add('message', type);
+          messageEl.textContent = text;
+          messageEl.classList.remove('hidden');
+          setTimeout(() => messageEl.classList.add('hidden'), 5000);
+        }
+
+        function createAvatar(email) {
+          const initials = (email.split('@')[0] || '').slice(0, 2).toUpperCase();
+          const span = document.createElement('span');
+          span.className = 'avatar';
+          span.textContent = initials || 'U';
+          return span;
+        }
+
+        function renderParticipantsList(participants) {
+          if (!participants || participants.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'participants-empty';
+            empty.textContent = 'No participants yet';
+            return empty;
+          }
+
+          const ul = document.createElement('ul');
+          ul.className = 'participants-list';
+          participants.forEach((p) => {
+            const li = document.createElement('li');
+            li.appendChild(createAvatar(p));
+            const span = document.createElement('span');
+            span.className = 'participant-email';
+            span.textContent = p;
+            li.appendChild(span);
+            ul.appendChild(li);
+          });
+          return ul;
+        }
+
+        function buildActivityCard(name, data) {
+          const card = document.createElement('div');
+          card.className = 'activity-card';
+          const title = document.createElement('h4');
+          title.textContent = name;
+          card.appendChild(title);
+
+          const desc = document.createElement('p');
+          desc.textContent = data.description;
+          card.appendChild(desc);
+
+          const schedule = document.createElement('p');
+          schedule.className = 'muted';
+          schedule.textContent = data.schedule;
+          card.appendChild(schedule);
+
+          // Participants section
+          const participantsSection = document.createElement('div');
+          participantsSection.className = 'participants-section';
+
+          const header = document.createElement('div');
+          header.className = 'participants-header';
+          header.textContent = 'Participants';
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = (data.participants || []).length;
+          header.appendChild(badge);
+          participantsSection.appendChild(header);
+
+          const participantsList = renderParticipantsList(data.participants || []);
+          participantsSection.appendChild(participantsList);
+          card.appendChild(participantsSection);
+
+          return card;
+        }
+
+        function populateUI(activities) {
+          activitiesList.innerHTML = '';
+          activitySelect.querySelectorAll('option[data-generated]').forEach(o => o.remove());
+          Object.keys(activities).forEach((name) => {
+            const card = buildActivityCard(name, activities[name]);
+            activitiesList.appendChild(card);
+
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            opt.setAttribute('data-generated', '1');
+            activitySelect.appendChild(opt);
+          });
+        }
+
+        function fetchActivities() {
+          fetch('/activities')
+            .then((r) => {
+              if (!r.ok) throw new Error('Failed to load activities');
+              return r.json();
+            })
+            .then((data) => populateUI(data))
+            .catch((err) => {
+              activitiesList.innerHTML = '<p class="error">Unable to load activities.</p>';
+              console.error(err);
+            });
+        }
+
+        signupForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const email = document.getElementById('email').value.trim();
+          const activityName = document.getElementById('activity').value;
+          if (!email || !activityName) {
+            showMessage('Please enter an email and choose an activity.', 'error');
+            return;
+          }
+
+          const url = `/activities/${encodeURIComponent(activityName)}/signup?email=${encodeURIComponent(email)}`;
+          fetch(url, { method: 'POST' })
+            .then((r) => r.json().then(body => ({ ok: r.ok, body })))
+            .then(({ ok, body }) => {
+              if (!ok) {
+                showMessage(body.detail || 'Signup failed', 'error');
+                throw new Error(body.detail || 'Signup failed');
+              }
+              showMessage(body.message || 'Signed up!', 'success');
+              // Refresh activities to reflect new participant
+              fetchActivities();
+              signupForm.reset();
+            })
+            .catch((err) => console.error(err));
+        });
+
+        // Initial load
+        fetchActivities();
+      })();
+    </script>
   </body>
 </html>
